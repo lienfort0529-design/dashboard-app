@@ -1,0 +1,112 @@
+<!doctype html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>全事業ダッシュボード</title>
+<meta name="theme-color" content="#1f2a3c">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-title" content="全事業">
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="apple-touch-icon" href="icon-180.png">
+<link rel="icon" href="icon.svg" type="image/svg+xml">
+<link rel="stylesheet" href="app.css">
+</head>
+<body>
+<section id="login" class="login" hidden>
+  <div class="login-box">
+    <h1>全事業ダッシュボード</h1>
+    <p>合言葉を入れてください</p>
+    <input id="pass" type="text" autocomplete="off" autocapitalize="off" spellcheck="false">
+    <button id="loginBtn" class="primary">入る</button>
+    <p id="loginErr" class="err"></p>
+  </div>
+</section>
+
+<div id="shell" hidden>
+  <header class="top">
+    <h1>全事業ダッシュボード</h1>
+    <nav class="tabs">
+      <button data-tab="dash" class="on">ダッシュボード</button>
+      <button data-tab="exp">経費</button>
+      <button data-tab="set">設定</button>
+    </nav>
+  </header>
+
+  <main>
+    <!-- ダッシュボード -->
+    <section id="tab-dash">
+      <div class="bar">
+        <select id="year"></select>
+        <select id="month"></select>
+        <div class="seg" id="scope"><button data-v="month" class="on">月</button><button data-v="year">年間累計</button></div>
+        <button id="reload" class="ghost" title="最新にする">更新</button>
+        <span id="updated" class="muted"></span>
+      </div>
+      <div id="notice"></div>
+      <div class="tiles" id="tiles"></div>
+      <div class="card">
+        <h2 id="bizTitle">事業別</h2>
+        <div class="tbl-wrap"><table class="tbl" id="bizTable"></table></div>
+        <div id="fiberDetail"></div>
+      </div>
+      <div class="card">
+        <h2>月ごとの推移</h2>
+        <div class="legend"><span><i class="sw s1"></i>売上</span><span><i class="sw s2"></i>経費</span><span><i class="sw ln"></i>利益</span></div>
+        <div class="chart" id="chart"></div>
+        <div class="tbl-wrap"><table class="tbl" id="monthTable"></table></div>
+      </div>
+    </section>
+
+    <!-- 経費 -->
+    <section id="tab-exp" hidden>
+      <div class="bar"><input type="month" id="expMonth"><span id="expTotal" class="muted"></span></div>
+      <div class="card">
+        <h2>経費を入れる</h2>
+        <p class="muted small">LINEの経理担当から送った経費も、ここに自動で入ります。</p>
+        <div class="form">
+          <label>日付<input type="date" id="eDate"></label>
+          <label>事業<select id="eBiz"></select></label>
+          <label>科目<input id="eCat" placeholder="旅費交通費 など"></label>
+          <label>内容<input id="eMemo" placeholder="タクシー など"></label>
+          <label>金額（円）<input id="eAmt" type="number" inputmode="numeric" min="0"></label>
+          <button id="eAdd" class="primary">追加</button>
+        </div>
+        <p id="eErr" class="err"></p>
+      </div>
+      <div class="card">
+        <h2>一覧</h2>
+        <div class="tbl-wrap"><table class="tbl" id="expTable"></table></div>
+      </div>
+    </section>
+
+    <!-- 設定 -->
+    <section id="tab-set" hidden>
+      <div class="card">
+        <h2>光回線の単価（税込・1開通あたり）</h2>
+        <p class="muted small">商材は光回線の「商材」シートから自動で並びます。単価が空の商材は売上0円で数えます。</p>
+        <div id="priceList" class="form-list"></div>
+        <button id="savePrices" class="primary">単価を保存</button>
+        <span id="priceMsg" class="muted"></span>
+      </div>
+      <div class="card">
+        <h2>Webマーケティングの売上（手入力）</h2>
+        <div class="form">
+          <label>年月<input type="month" id="wYm"></label>
+          <label>金額（円）<input id="wAmt" type="number" inputmode="numeric" min="0" placeholder="空にすると消す"></label>
+          <label>メモ<input id="wMemo"></label>
+          <button id="wSave" class="primary">保存</button>
+        </div>
+        <p id="wMsg" class="muted"></p>
+      </div>
+      <div class="card">
+        <h2>この端末</h2>
+        <button id="logout" class="ghost">合言葉を入れ直す</button>
+      </div>
+    </section>
+  </main>
+</div>
+<div id="tip" class="tip" hidden></div>
+<script src="app.js"></script>
+</body>
+</html>
