@@ -35,7 +35,8 @@ $('logout').onclick = () => { store.del(KEY.pass); store.del(KEY.data); showLogi
 
 document.querySelectorAll('.tabs button').forEach(b => b.onclick = () => {
   document.querySelectorAll('.tabs button').forEach(x => x.classList.toggle('on', x === b));
-  ['dash', 'exp', 'set'].forEach(t => $('tab-' + t).hidden = t !== b.dataset.tab);
+  ['dash', 'stmt', 'exp', 'set'].forEach(t => $('tab-' + t).hidden = t !== b.dataset.tab);
+  if (b.dataset.tab === 'stmt') loadStmt();
   if (b.dataset.tab === 'exp') loadExp();
   if (b.dataset.tab === 'set') loadSettings();
 });
@@ -65,6 +66,7 @@ function setData(d) {
   $('month').value = state.ym || '';
   $('month').hidden = state.scope === 'year';
   $('updated').textContent = d.updated + ' 時点';
+  $('pendBadge').hidden = !d.pending; $('pendBadge').textContent = d.pending || '';
   render();
 }
 
@@ -96,7 +98,7 @@ function render() {
   if (!d) return;
   const notes = [];
   if (!d.months.length) notes.push(`${d.start.slice(0, 4)}年${Number(d.start.slice(5))}月から表示します（LINE経理に事業を付けてからの数字）。`);
-  if (d.missingPrices && d.missingPrices.length) notes.push('光回線の単価が入っていない商材：' + d.missingPrices.map(esc).join('・') + '（設定タブで入れてください。入るまで0円で数えます）');
+  if (d.pending) notes.push(`確認待ちの明細が ${d.pending}件 あります（明細タブで確かめて「反映」すると売上に入ります）`);
   (d.errors || []).forEach(e => notes.push('読めませんでした：' + esc(e)));
   $('notice').innerHTML = notes.map(n => `<div class="notice">${n}</div>`).join('');
   if (!d.months.length) { $('tiles').innerHTML = ''; $('bizTable').innerHTML = ''; $('fiberDetail').innerHTML = ''; $('chart').innerHTML = '<div class="empty">まだ表示する月がありません</div>'; $('monthTable').innerHTML = ''; return; }
@@ -123,10 +125,10 @@ function render() {
     d.biz.map(b => row(b.name, t.biz[b.key].sales, t.biz[b.key].expense, '', b.expenseOnly)).join('') +
     row('合計', t.sales, t.expense, 'total') + '</tbody>';
 
-  // 光回線の内訳（月のときだけ）
-  const fd = !year && d.detail[state.ym] && d.detail[state.ym].kaisen;
-  $('fiberDetail').innerHTML = fd && fd.products && fd.products.length ? `<p class="muted small" style="margin:10px 0 0">光回線の内訳（開通 ${fd.count}件）：` +
-    fd.products.map(p => `${esc(p.product)} ${p.count}件 × ${p.price == null ? '単価なし' : yen(p.price)}`).join(' ／ ') + '</p>' : '';
+  // 明細の件数（月のときだけ）
+  const dm = !year && d.detail[state.ym] || {};
+  const parts = (d.stmtBiz || []).filter(k => dm[k] && dm[k].count).map(k => `${esc(bizName(k))} ${dm[k].count}件`);
+  $('fiberDetail').innerHTML = parts.length ? `<p class="muted small" style="margin:10px 0 0">反映した明細：${parts.join(' ／ ')}</p>` : '';
 
   drawChart(d);
   $('monthTable').innerHTML = '<thead><tr><th>月</th><th>売上</th><th>経費</th><th>利益</th></tr></thead><tbody>' +
@@ -211,20 +213,97 @@ $('eAdd').onclick = () => {
   }).catch(e => $('eErr').textContent = e.message).finally(() => $('eAdd').disabled = false);
 };
 
+// ===== 明細 =====
+const stmtBizOptions = sel => ((state.data && state.data.stmtBiz) || ['kaisen', 'webma']).map(k => `<option value="${k}"${k === sel ? ' selected' : ''}>${esc(bizName(k))}</option>`).join('');
+let partnerCache = [];
+function loadPartners() {
+  return api('partners').then(list => { partnerCache = list; $('partnerList').innerHTML = list.map(p => `<option value="${esc(p.name)}">`).join(''); return list; });
+}
+function loadStmt() {
+  if (!$('stmtMonth').value) $('stmtMonth').value = today().slice(0, 7);
+  if (!$('uBiz').options.length) $('uBiz').innerHTML = stmtBizOptions();
+  loadPartners().catch(() => {});
+  $('pendList').innerHTML = '<p class="muted">読み込み中…</p>';
+  api('statements', $('stmtMonth').value).then(list => {
+    const pend = list.filter(r => r.status === '確認待ち'), rest = list.filter(r => r.status !== '確認待ち' && (r.date || r.received).slice(0, 7) === $('stmtMonth').value);
+    $('pendBadge').hidden = !pend.length; $('pendBadge').textContent = pend.length || '';
+    $('pendList').innerHTML = pend.length ? pend.map(r => `<div class="stmt" data-id="${esc(r.id)}">
+      <div class="head"><a href="${esc(r.url)}" target="_blank" rel="noopener">${esc(r.name)}</a><span class="muted small">${esc(r.received)} 受信・${r.source.startsWith('gm:') ? 'メール' : '画面から'}</span></div>
+      <div class="form">
+        <label>事業<select data-f="biz">${stmtBizOptions(r.biz)}</select></label>
+        <label>取引先<input data-f="partner" list="partnerList" value="${esc(r.partner)}"></label>
+        <label>支払日<input data-f="date" type="date" value="${esc(r.date)}"></label>
+        <label>金額（円）<input data-f="amount" type="number" inputmode="numeric" value="${r.amount || ''}"></label>
+        <div class="acts"><button class="primary" data-act="ok">反映</button><button class="ghost" data-act="ng">除外</button></div>
+      </div>
+      <p class="muted small" style="margin:6px 0 0">${esc(r.note)}</p><p class="err small" data-err></p></div>`).join('')
+      : '<p class="muted">確認待ちの明細はありません</p>';
+    $('pendList').querySelectorAll('.stmt').forEach(el => {
+      const f = k => el.querySelector(`[data-f="${k}"]`).value, err = el.querySelector('[data-err]');
+      el.querySelector('[data-act="ok"]').onclick = e => {
+        e.target.disabled = true; err.textContent = '';
+        api('approveStatement', el.dataset.id, { biz: f('biz'), partner: f('partner'), date: f('date'), amount: f('amount') })
+          .then(() => { loadStmt(); refresh(true); }).catch(x => { err.textContent = x.message; e.target.disabled = false; });
+      };
+      el.querySelector('[data-act="ng"]').onclick = e => {
+        e.target.disabled = true;
+        api('setStatementStatus', el.dataset.id, '除外').then(() => loadStmt()).catch(x => { err.textContent = x.message; e.target.disabled = false; });
+      };
+    });
+    const ok = rest.filter(r => r.status === '反映');
+    $('stmtTotal').textContent = ok.length ? `反映 ${ok.length}件　合計 ${yen(ok.reduce((a, r) => a + r.amount, 0))}` : '';
+    $('stmtTable').innerHTML = rest.length ? '<thead><tr><th>支払日</th><th>事業</th><th>取引先</th><th>金額</th><th>状態</th><th></th></tr></thead><tbody>' +
+      rest.map(r => `<tr><td>${esc((r.date || '').slice(5).replace('-', '/'))}</td><td style="text-align:left">${esc(bizName(r.biz))}</td><td style="text-align:left"><a href="${esc(r.url)}" target="_blank" rel="noopener">${esc(r.partner || r.name)}</a></td><td>${r.status === '反映' ? yen(r.amount) : '—'}</td><td>${esc(r.status)}</td><td><button class="del" data-id="${esc(r.id)}">確認待ちに戻す</button></td></tr>`).join('') + '</tbody>'
+      : '<tr><td class="muted">この月に反映した明細はまだありません</td></tr>';
+    $('stmtTable').querySelectorAll('.del').forEach(b => b.onclick = () => {
+      b.disabled = true;
+      api('setStatementStatus', b.dataset.id, '確認待ち').then(() => { loadStmt(); refresh(true); }).catch(e => alert(e.message));
+    });
+  }).catch(e => { if (e.message !== 'auth') $('pendList').innerHTML = `<p class="err">${esc(e.message)}</p>`; });
+}
+$('stmtMonth').onchange = loadStmt;
+$('uPartner').onchange = () => { const p = partnerCache.find(x => x.name === $('uPartner').value.trim()); if (p && p.biz) $('uBiz').value = p.biz; };
+$('uAdd').onclick = () => {
+  const file = $('uFile').files[0];
+  if (!file) { $('uMsg').textContent = 'ファイルを選んでください'; return; }
+  if (file.size > 20 * 1024 * 1024) { $('uMsg').textContent = '20MB までのファイルにしてください'; return; }
+  $('uAdd').disabled = true; $('uMsg').textContent = '読み取り中…（30秒ほどかかることがあります）';
+  const rd = new FileReader();
+  rd.onload = () => {
+    api('uploadStatement', { biz: $('uBiz').value, partner: $('uPartner').value.trim(), name: file.name, data: String(rd.result).split(',')[1] })
+      .then(r => {
+        $('uMsg').textContent = r.dup ? 'このファイルはもう入っています' : `読み取りました：${r.amount ? yen(r.amount) : '金額なし'}・${r.date || '支払日なし'}。下の「確認待ち」で確かめてください`;
+        $('uFile').value = ''; loadStmt(); refresh(true);
+      }).catch(e => $('uMsg').textContent = e.message).finally(() => $('uAdd').disabled = false);
+  };
+  rd.readAsDataURL(file);
+};
+$('mailNow').onclick = () => {
+  $('mailNow').disabled = true; $('mailMsg').textContent = '確認中…';
+  api('checkMail').then(r => { $('mailMsg').textContent = r.busy ? 'いま自動で確認中です。少ししてから見てください' : r.added.length ? `${r.added.length}件 入りました` : '新しい明細はありません'; loadStmt(); refresh(true); })
+    .catch(e => $('mailMsg').textContent = e.message).finally(() => $('mailNow').disabled = false);
+};
+
 // ===== 設定 =====
+function partnerRow(p) {
+  p = p || {};
+  const join = v => Array.isArray(v) ? v.join(',') : (v || '');
+  return `<div class="partner-row"><input data-f="name" placeholder="取引先名" value="${esc(p.name || '')}"><select data-f="biz">${stmtBizOptions(p.biz)}</select><input data-f="email" type="email" placeholder="メールアドレス（空＝画面からだけ）" value="${esc(p.email || '')}"><input data-f="amountLabels" placeholder="金額の見出し" value="${esc(join(p.amountLabels))}"><input data-f="dateLabels" placeholder="日付の見出し" value="${esc(join(p.dateLabels))}"><button class="del" data-rm>消す</button></div>`;
+}
+function bindPartnerRows() { $('partnerRows').querySelectorAll('[data-rm]').forEach(b => b.onclick = () => b.closest('.partner-row').remove()); }
 function loadSettings() {
   if (!$('wYm').value) $('wYm').value = today().slice(0, 7);
-  $('priceList').innerHTML = '<span class="muted">読み込み中…</span>';
-  api('settings').then(s => {
-    $('priceList').innerHTML = s.products.length ? s.products.map(p => `<label><span>${esc(p.product)}</span><input type="number" inputmode="numeric" min="0" data-p="${esc(p.product)}" value="${p.price == null ? '' : p.price}" placeholder="円"></label>`).join('')
-      : '<span class="muted">商材が読めませんでした（取得元の kaisen_osaka を確認）</span>';
-  }).catch(e => { if (e.message !== 'auth') $('priceList').innerHTML = `<span class="err">${esc(e.message)}</span>`; });
+  $('partnerRows').innerHTML = '<span class="muted">読み込み中…</span>';
+  loadPartners().then(list => {
+    $('partnerRows').innerHTML = '<div class="partner-row partner-head"><span>取引先名</span><span>事業</span><span>メールアドレス</span><span>金額の見出し</span><span>日付の見出し</span><span></span></div>' + (list.length ? list : [{}]).map(partnerRow).join('');
+    bindPartnerRows();
+  }).catch(e => { if (e.message !== 'auth') $('partnerRows').innerHTML = `<span class="err">${esc(e.message)}</span>`; });
 }
-$('savePrices').onclick = () => {
-  const prices = {};
-  $('priceList').querySelectorAll('input[data-p]').forEach(i => prices[i.dataset.p] = i.value === '' ? null : Number(i.value));
-  $('priceMsg').textContent = '保存中…';
-  api('setPrices', prices).then(() => { $('priceMsg').textContent = '保存しました'; refresh(); }).catch(e => $('priceMsg').textContent = e.message);
+$('addPartner').onclick = () => { $('partnerRows').insertAdjacentHTML('beforeend', partnerRow()); bindPartnerRows(); };
+$('savePartners').onclick = () => {
+  const list = [...$('partnerRows').querySelectorAll('.partner-row:not(.partner-head)')].map(r => { const o = {}; r.querySelectorAll('[data-f]').forEach(i => o[i.dataset.f] = i.value.trim()); return o; }).filter(p => p.name);
+  $('partnerMsg').textContent = '保存中…';
+  api('savePartners', list).then(l => { partnerCache = l; $('partnerMsg').textContent = '保存しました'; }).catch(e => $('partnerMsg').textContent = e.message);
 };
 $('wSave').onclick = () => {
   $('wMsg').textContent = '保存中…';

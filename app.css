@@ -91,7 +91,18 @@ button { cursor: pointer; }
 .form-list { display: grid; gap: 8px; margin-bottom: 12px; }
 .form-list label { display: grid; grid-template-columns: 1fr 160px; align-items: center; gap: 10px; }
 
+.badge { display: inline-block; min-width: 18px; padding: 0 5px; margin-left: 6px; border-radius: 9px; background: #eb6834; color: #fff; font-size: 12px; line-height: 18px; text-align: center; font-weight: 700; }
+.stmt { border: 1px solid var(--line); border-radius: 10px; padding: 12px; margin-bottom: 10px; }
+.stmt .head { display: flex; flex-wrap: wrap; gap: 4px 12px; align-items: baseline; margin-bottom: 8px; }
+.stmt .head a { color: var(--accent); font-weight: 600; word-break: break-all; }
+.stmt .acts { display: flex; gap: 8px; align-items: end; }
+.partner-rows { display: grid; gap: 8px; margin-bottom: 10px; }
+.partner-row { display: grid; grid-template-columns: 1.2fr .9fr 1.6fr 1.2fr 1.2fr auto; gap: 6px; align-items: center; }
+.partner-head { font-size: 12px; color: var(--muted); }
+
 @media (max-width: 640px) {
+  .partner-row { grid-template-columns: 1fr 1fr; }
+  .partner-head { display: none; }
   .tiles { grid-template-columns: 1fr; gap: 8px; }
   .tile { display: flex; justify-content: space-between; align-items: baseline; flex-wrap: wrap; gap: 4px 12px; }
   .tile .v { font-size: 22px; }

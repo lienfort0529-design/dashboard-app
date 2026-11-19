@@ -28,6 +28,7 @@
     <h1>全事業ダッシュボード</h1>
     <nav class="tabs">
       <button data-tab="dash" class="on">ダッシュボード</button>
+      <button data-tab="stmt">明細<span id="pendBadge" class="badge" hidden></span></button>
       <button data-tab="exp">経費</button>
       <button data-tab="set">設定</button>
     </nav>
@@ -58,6 +59,31 @@
       </div>
     </section>
 
+    <!-- 明細 -->
+    <section id="tab-stmt" hidden>
+      <div class="card">
+        <h2>明細を入れる</h2>
+        <p class="muted small">LINE などで届いた明細（PDF・Excel・CSV）を選ぶと、金額と支払日を読み取って「確認待ち」に入ります。メールで届く明細は、設定タブで登録した取引先から1時間ごとに自動で入ります。</p>
+        <div class="form">
+          <label>事業<select id="uBiz"></select></label>
+          <label>取引先<input id="uPartner" list="partnerList" placeholder="取引先名"></label>
+          <label>ファイル<input id="uFile" type="file" accept=".pdf,.xlsx,.xls,.csv"></label>
+          <button id="uAdd" class="primary">読み取る</button>
+        </div>
+        <datalist id="partnerList"></datalist>
+        <p id="uMsg" class="muted"></p>
+      </div>
+      <div class="card">
+        <div class="bar" style="margin:0 0 10px"><h2 style="margin:0">確認待ち</h2><button id="mailNow" class="ghost">メールを今すぐ確認</button><span id="mailMsg" class="muted small"></span></div>
+        <p class="muted small">金額と支払日を確かめて「反映」を押すと、支払日の月の売上に入ります。</p>
+        <div id="pendList"></div>
+      </div>
+      <div class="card">
+        <div class="bar" style="margin:0 0 10px"><h2 style="margin:0">反映済み</h2><input type="month" id="stmtMonth"><span id="stmtTotal" class="muted"></span></div>
+        <div class="tbl-wrap"><table class="tbl" id="stmtTable"></table></div>
+      </div>
+    </section>
+
     <!-- 経費 -->
     <section id="tab-exp" hidden>
       <div class="bar"><input type="month" id="expMonth"><span id="expTotal" class="muted"></span></div>
@@ -83,14 +109,16 @@
     <!-- 設定 -->
     <section id="tab-set" hidden>
       <div class="card">
-        <h2>光回線の単価（税込・1開通あたり）</h2>
-        <p class="muted small">商材は光回線の「商材」シートから自動で並びます。単価が空の商材は売上0円で数えます。</p>
-        <div id="priceList" class="form-list"></div>
-        <button id="savePrices" class="primary">単価を保存</button>
-        <span id="priceMsg" class="muted"></span>
+        <h2>取引先（明細の送り主）</h2>
+        <p class="muted small">メールアドレスを入れた取引先から届いた明細を自動で読みます。金額・支払日の見出しは、明細に書いてある言葉（例：お振込金額）。空なら「支払金額」「振込金額」「合計」などで探します。複数はカンマ区切り。</p>
+        <div id="partnerRows" class="partner-rows"></div>
+        <button id="addPartner" class="ghost">＋ 取引先を足す</button>
+        <button id="savePartners" class="primary">保存</button>
+        <span id="partnerMsg" class="muted"></span>
       </div>
       <div class="card">
-        <h2>Webマーケティングの売上（手入力）</h2>
+        <h2>Webマーケティングの売上（手入力・予備）</h2>
+        <p class="muted small">明細がない分だけ入れてください（明細の分に足して数えます）。</p>
         <div class="form">
           <label>年月<input type="month" id="wYm"></label>
           <label>金額（円）<input id="wAmt" type="number" inputmode="numeric" min="0" placeholder="空にすると消す"></label>
