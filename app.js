@@ -42,12 +42,16 @@ document.querySelectorAll('.tabs button').forEach(b => b.onclick = () => {
 });
 
 const now = new Date();
-const state = { year: now.getFullYear(), ym: null, scope: 'month', data: null };
+// 1期＝5月〜翌4月（4月決算）。year＝決算月の年（2027 → 2027年4月期＝2026年5月〜2027年4月）
+const FY_END = 4, fyNow = now.getFullYear() + (now.getMonth() + 1 > FY_END ? 1 : 0);
+const fyLabel = y => `${y}年${FY_END}月期`;
+const ymFull = ym => `${ym.slice(0, 4)}年${Number(ym.slice(5))}月`;
+const state = { year: fyNow, ym: null, scope: 'month', data: null };
 
 function start(d) {
   $('shell').hidden = false;
-  const years = []; for (let y = 2026; y <= now.getFullYear(); y++) years.push(y);
-  $('year').innerHTML = years.map(y => `<option value="${y}">${y}年</option>`).join('');
+  const years = []; for (let y = 2027; y <= fyNow; y++) years.push(y);
+  $('year').innerHTML = years.map(y => `<option value="${y}">${fyLabel(y)}</option>`).join('');
   $('year').value = state.year;
   if (d) setData(d);
   refresh();
@@ -60,7 +64,7 @@ function refresh(fresh) {
 
 function setData(d) {
   state.data = d;
-  if (d.year === now.getFullYear()) store.set(KEY.data, d);
+  if (d.year === fyNow) store.set(KEY.data, d);
   if (!d.months.includes(state.ym)) state.ym = d.months[d.months.length - 1] || null;
   $('month').innerHTML = d.months.map(ym => `<option value="${ym}">${ymLabel(ym)}</option>`).join('');
   $('month').value = state.ym || '';
@@ -119,7 +123,7 @@ function render() {
     ['利益', t.profit, prev && prev.profit, true, 'profit'],
   ].map(([k, v, o, up, cls]) => `<div class="tile ${cls}"><div class="k">${k}${k === '利益' && t.sales ? `（利益率 ${Math.round(t.profit / t.sales * 100)}%）` : ''}</div><div class="v">${yen(v)}</div><div class="d">${diff(v, o, up)}</div></div>`).join('');
 
-  $('bizTitle').textContent = year ? `事業別（${d.year}年 累計）` : `事業別（${d.year}年${ymLabel(state.ym)}）`;
+  $('bizTitle').textContent = year ? `事業別（${fyLabel(d.year)} 累計）` : `事業別（${ymFull(state.ym)}）`;
   const row = (name, s, e, cls, salesNA) => `<tr class="${cls || ''}"><td>${name}</td><td class="${salesNA ? 'na' : ''}">${salesNA ? '—' : yen(s)}</td><td>${yen(e)}</td><td class="${s - e < 0 ? 'neg' : ''}">${yen(s - e)}</td><td>${!salesNA && s ? Math.round((s - e) / s * 100) + '%' : '—'}</td></tr>`;
   $('bizTable').innerHTML = '<thead><tr><th>事業</th><th>売上</th><th>経費</th><th>利益</th><th>利益率</th></tr></thead><tbody>' +
     d.biz.map(b => row(b.name, t.biz[b.key].sales, t.biz[b.key].expense, '', b.expenseOnly)).join('') +
@@ -169,7 +173,7 @@ function drawChart(d) {
   el.querySelectorAll('rect[data-i]').forEach(rc => {
     const show = e => {
       const r = rows[rc.dataset.i], p = e.touches ? e.touches[0] : e;
-      tip.innerHTML = `<b>${d.year}年${ymLabel(r.ym)}</b><div class="row"><span><i class="sw s1"></i> 売上</span><span>${yen(r.t.sales)}</span></div><div class="row"><span><i class="sw s2"></i> 経費</span><span>${yen(r.t.expense)}</span></div><div class="row"><span><i class="sw ln"></i> 利益</span><span>${yen(r.t.profit)}</span></div>`;
+      tip.innerHTML = `<b>${ymFull(r.ym)}</b><div class="row"><span><i class="sw s1"></i> 売上</span><span>${yen(r.t.sales)}</span></div><div class="row"><span><i class="sw s2"></i> 経費</span><span>${yen(r.t.expense)}</span></div><div class="row"><span><i class="sw ln"></i> 利益</span><span>${yen(r.t.profit)}</span></div>`;
       tip.hidden = false;
       const x = Math.min(p.clientX + 12, window.innerWidth - tip.offsetWidth - 8);
       tip.style.left = x + 'px'; tip.style.top = (p.clientY + 12) + 'px';
