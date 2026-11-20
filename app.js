@@ -214,7 +214,7 @@ $('eAdd').onclick = () => {
 };
 
 // ===== 明細 =====
-const stmtBizOptions = sel => ((state.data && state.data.stmtBiz) || ['kaisen', 'webma']).map(k => `<option value="${k}"${k === sel ? ' selected' : ''}>${esc(bizName(k))}</option>`).join('');
+const stmtBizOptions = (sel, blank) => (blank ? `<option value="">${blank}</option>` : '') + ((state.data && state.data.stmtBiz) || ['kaisen', 'webma']).map(k => `<option value="${k}"${k === sel ? ' selected' : ''}>${esc(bizName(k))}</option>`).join('');
 let partnerCache = [];
 function loadPartners() {
   return api('partners').then(list => { partnerCache = list; $('partnerList').innerHTML = list.map(p => `<option value="${esc(p.name)}">`).join(''); return list; });
@@ -230,7 +230,7 @@ function loadStmt() {
     $('pendList').innerHTML = pend.length ? pend.map(r => `<div class="stmt" data-id="${esc(r.id)}">
       <div class="head"><a href="${esc(r.url)}" target="_blank" rel="noopener">${esc(r.name)}</a><span class="muted small">${esc(r.received)} 受信・${r.source.startsWith('gm:') ? 'メール' : '画面から'}</span></div>
       <div class="form">
-        <label>事業<select data-f="biz">${stmtBizOptions(r.biz)}</select></label>
+        <label>事業<select data-f="biz">${stmtBizOptions(r.biz, r.biz ? '' : '選んでください')}</select></label>
         <label>取引先<input data-f="partner" list="partnerList" value="${esc(r.partner)}"></label>
         <label>支払日<input data-f="date" type="date" value="${esc(r.date)}"></label>
         <label>金額（円）<input data-f="amount" type="number" inputmode="numeric" value="${r.amount || ''}"></label>
@@ -288,7 +288,7 @@ $('mailNow').onclick = () => {
 function partnerRow(p) {
   p = p || {};
   const join = v => Array.isArray(v) ? v.join(',') : (v || '');
-  return `<div class="partner-row"><input data-f="name" placeholder="取引先名" value="${esc(p.name || '')}"><select data-f="biz">${stmtBizOptions(p.biz)}</select><input data-f="email" type="email" placeholder="メールアドレス（空＝画面からだけ）" value="${esc(p.email || '')}"><input data-f="amountLabels" placeholder="金額の見出し" value="${esc(join(p.amountLabels))}"><input data-f="dateLabels" placeholder="日付の見出し" value="${esc(join(p.dateLabels))}"><button class="del" data-rm>消す</button></div>`;
+  return `<div class="partner-row"><input data-f="name" placeholder="取引先名" value="${esc(p.name || '')}"><select data-f="biz">${stmtBizOptions(p.biz, '明細ごとに選ぶ')}</select><input data-f="email" type="email" placeholder="メールアドレス（空＝画面からだけ）" value="${esc(p.email || '')}"><input data-f="amountLabels" placeholder="金額の見出し" value="${esc(join(p.amountLabels))}"><input data-f="dateLabels" placeholder="日付の見出し" value="${esc(join(p.dateLabels))}"><button class="del" data-rm>消す</button></div>`;
 }
 function bindPartnerRows() { $('partnerRows').querySelectorAll('[data-rm]').forEach(b => b.onclick = () => b.closest('.partner-row').remove()); }
 function loadSettings() {
