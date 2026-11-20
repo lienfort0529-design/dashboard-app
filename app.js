@@ -192,8 +192,16 @@ function loadExp() {
   api('expenses', $('expMonth').value).then(list => {
     $('expTotal').textContent = list.length ? `${list.length}件　合計 ${yen(list.reduce((a, r) => a + r.amount, 0))}` : '';
     $('expTable').innerHTML = list.length ? '<thead><tr><th>日付</th><th>事業</th><th>科目</th><th>内容</th><th>金額</th><th></th></tr></thead><tbody>' +
-      list.map(r => `<tr><td>${r.date.slice(5).replace('-', '/')}</td><td style="text-align:left">${esc(bizName(r.biz))}</td><td style="text-align:left">${esc(r.category)}</td><td style="text-align:left">${esc(r.memo)}</td><td>${yen(r.amount)}</td><td><button class="del" data-id="${esc(r.id)}">消す</button></td></tr>`).join('') + '</tbody>'
+      list.map(r => `<tr><td>${r.date.slice(5).replace('-', '/')}</td><td style="text-align:left">${esc(bizName(r.biz))}</td><td style="text-align:left">${esc(r.category)}</td><td style="text-align:left">${esc(r.memo)}${r.id.startsWith('fx:') ? '<span class="tag">固定</span>' : ''}</td><td><button class="amt" data-id="${esc(r.id)}" data-v="${r.amount}" title="金額を直す">${yen(r.amount)}</button></td><td><button class="del" data-id="${esc(r.id)}">消す</button></td></tr>`).join('') + '</tbody>'
       : '<tr><td class="muted">この月の経費はまだありません</td></tr>';
+    // 金額を押すと、その場で直せる
+    $('expTable').querySelectorAll('.amt').forEach(b => b.onclick = () => {
+      const td = b.parentNode;
+      td.innerHTML = `<span class="amt-edit"><input type="number" inputmode="numeric" value="${b.dataset.v}"><button class="del">保存</button></span>`;
+      const inp = td.querySelector('input'); inp.focus();
+      const save = () => { td.querySelector('button').disabled = true; api('updateExpense', b.dataset.id, { amount: inp.value }).then(() => { loadExp(); refresh(true); }).catch(e => alert(e.message)); };
+      td.querySelector('button').onclick = save; inp.onkeydown = e => { if (e.key === 'Enter') save(); };
+    });
     // 消すは2回押し（1回目で赤くなる）
     $('expTable').querySelectorAll('.del').forEach(b => b.onclick = () => {
       if (!b.classList.contains('arm')) { b.classList.add('arm'); b.textContent = 'もう一度押すと消す'; setTimeout(() => { b.classList.remove('arm'); b.textContent = '消す'; }, 4000); return; }
@@ -291,8 +299,27 @@ function partnerRow(p) {
   return `<div class="partner-row"><input data-f="name" placeholder="取引先名" value="${esc(p.name || '')}"><select data-f="biz">${stmtBizOptions(p.biz, '明細ごとに選ぶ')}</select><input data-f="email" type="email" placeholder="メールアドレス（空＝画面からだけ）" value="${esc(p.email || '')}"><input data-f="amountLabels" placeholder="金額の見出し" value="${esc(join(p.amountLabels))}"><input data-f="dateLabels" placeholder="日付の見出し" value="${esc(join(p.dateLabels))}"><button class="del" data-rm>消す</button></div>`;
 }
 function bindPartnerRows() { $('partnerRows').querySelectorAll('[data-rm]').forEach(b => b.onclick = () => b.closest('.partner-row').remove()); }
+function fixedRow(f) {
+  f = f || { day: 1, start: today().slice(0, 7) };
+  const opts = ((state.data && state.data.biz) || []).map(b => `<option value="${b.key}"${b.key === (f.biz || 'common') ? ' selected' : ''}>${esc(b.name)}</option>`).join('');
+  return `<div class="fixed-row" data-id="${esc(f.id || '')}"><select data-f="biz">${opts}</select><input data-f="category" placeholder="科目（地代家賃 など）" value="${esc(f.category || '')}"><input data-f="memo" placeholder="内容（事務所家賃 など）" value="${esc(f.memo || '')}"><input data-f="amount" type="number" inputmode="numeric" placeholder="金額（円）" value="${f.amount || ''}"><input data-f="day" type="number" min="1" max="31" title="毎月の日" value="${f.day || 1}"><input data-f="start" type="month" title="開始月" value="${esc(f.start || '')}"><input data-f="end" type="month" title="終了月（空＝ずっと）" value="${esc(f.end || '')}"><button class="del" data-rm>消す</button></div>`;
+}
+function bindFixedRows() { $('fixedRows').querySelectorAll('[data-rm]').forEach(b => b.onclick = () => b.closest('.fixed-row').remove()); }
+$('addFixed').onclick = () => { $('fixedRows').insertAdjacentHTML('beforeend', fixedRow()); bindFixedRows(); };
+$('saveFixed').onclick = () => {
+  const list = [...$('fixedRows').querySelectorAll('.fixed-row:not(.partner-head)')].map(r => { const o = { id: r.dataset.id }; r.querySelectorAll('[data-f]').forEach(i => o[i.dataset.f] = i.value.trim()); return o; }).filter(f => f.memo || f.category || f.amount);
+  $('fixedMsg').textContent = '保存中…'; $('saveFixed').disabled = true;
+  api('saveFixedCosts', list).then(r => { drawFixed(r.list); $('fixedMsg').textContent = '保存しました' + (r.added.length ? `（経費に ${r.added.length}件 入れました）` : ''); refresh(true); })
+    .catch(e => $('fixedMsg').textContent = e.message).finally(() => $('saveFixed').disabled = false);
+};
+function drawFixed(list) {
+  $('fixedRows').innerHTML = '<div class="fixed-row partner-head"><span>事業</span><span>科目</span><span>内容</span><span>金額（円）</span><span>毎月の日</span><span>開始月</span><span>終了月</span><span></span></div>' + (list.length ? list : [null]).map(fixedRow).join('');
+  bindFixedRows();
+}
 function loadSettings() {
   if (!$('wYm').value) $('wYm').value = today().slice(0, 7);
+  $('fixedRows').innerHTML = '<span class="muted">読み込み中…</span>';
+  api('fixedCosts').then(drawFixed).catch(e => { if (e.message !== 'auth') $('fixedRows').innerHTML = `<span class="err">${esc(e.message)}</span>`; });
   $('partnerRows').innerHTML = '<span class="muted">読み込み中…</span>';
   loadPartners().then(list => {
     $('partnerRows').innerHTML = '<div class="partner-row partner-head"><span>取引先名</span><span>事業</span><span>メールアドレス</span><span>金額の見出し</span><span>日付の見出し</span><span></span></div>' + (list.length ? list : [{}]).map(partnerRow).join('');
