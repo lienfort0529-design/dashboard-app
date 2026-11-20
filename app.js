@@ -303,10 +303,13 @@ function partnerRow(p) {
   return `<div class="partner-row"><input data-f="name" placeholder="取引先名" value="${esc(p.name || '')}"><select data-f="biz">${stmtBizOptions(p.biz, '明細ごとに選ぶ')}</select><input data-f="email" type="email" placeholder="メールアドレス（空＝画面からだけ）" value="${esc(p.email || '')}"><input data-f="amountLabels" placeholder="金額の見出し" value="${esc(join(p.amountLabels))}"><input data-f="dateLabels" placeholder="日付の見出し" value="${esc(join(p.dateLabels))}"><button class="del" data-rm>消す</button></div>`;
 }
 function bindPartnerRows() { $('partnerRows').querySelectorAll('[data-rm]').forEach(b => b.onclick = () => b.closest('.partner-row').remove()); }
+// 固定費の科目（プルダウン）。一覧にない科目で保存されたものは、その行だけ選べるように足す
+const FIXED_CATS = ['地代家賃', '水道光熱費', '通信費', 'リース料', '保険料', '支払手数料', '広告宣伝費', '外注費', '給料手当', '法定福利費', '福利厚生費', '車両費', '租税公課', '諸会費', '消耗品費', '新聞図書費', '雑費'];
+const catOptions = sel => '<option value="">科目を選ぶ</option>' + (sel && !FIXED_CATS.includes(sel) ? [sel] : []).concat(FIXED_CATS).map(c => `<option${c === sel ? ' selected' : ''}>${esc(c)}</option>`).join('');
 function fixedRow(f) {
   f = f || { day: 1, start: today().slice(0, 7) };
   const opts = ((state.data && state.data.biz) || []).map(b => `<option value="${b.key}"${b.key === (f.biz || 'common') ? ' selected' : ''}>${esc(b.name)}</option>`).join('');
-  return `<div class="fixed-row" data-id="${esc(f.id || '')}"><select data-f="biz">${opts}</select><input data-f="category" placeholder="科目（地代家賃 など）" value="${esc(f.category || '')}"><input data-f="memo" placeholder="内容（事務所家賃 など）" value="${esc(f.memo || '')}"><input data-f="amount" type="number" inputmode="numeric" placeholder="金額（円）" value="${f.amount || ''}"><input data-f="day" type="number" min="1" max="31" title="毎月の日" value="${f.day || 1}"><input data-f="start" type="month" title="開始月" value="${esc(f.start || '')}"><input data-f="end" type="month" title="終了月（空＝ずっと）" value="${esc(f.end || '')}"><button class="del" data-rm>消す</button></div>`;
+  return `<div class="fixed-row" data-id="${esc(f.id || '')}"><select data-f="biz">${opts}</select><select data-f="category">${catOptions(f.category)}</select><input data-f="memo" placeholder="内容（事務所家賃 など）" value="${esc(f.memo || '')}"><input data-f="amount" type="number" inputmode="numeric" placeholder="金額（円）" value="${f.amount || ''}"><input data-f="day" type="number" min="1" max="31" title="毎月の日" value="${f.day || 1}"><input data-f="start" type="month" title="開始月" value="${esc(f.start || '')}"><input data-f="end" type="month" title="終了月（空＝ずっと）" value="${esc(f.end || '')}"><button class="del" data-rm>消す</button></div>`;
 }
 function bindFixedRows() { $('fixedRows').querySelectorAll('[data-rm]').forEach(b => b.onclick = () => b.closest('.fixed-row').remove()); }
 $('addFixed').onclick = () => { $('fixedRows').insertAdjacentHTML('beforeend', fixedRow()); bindFixedRows(); };
