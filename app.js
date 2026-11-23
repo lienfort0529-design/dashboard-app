@@ -215,6 +215,53 @@ function loadExp() {
   }).catch(e => { if (e.message !== 'auth') $('expTable').innerHTML = `<tr><td class="err">${esc(e.message)}</td></tr>`; });
 }
 $('expMonth').onchange = loadExp;
+
+// ===== カード明細 =====
+const EXP_CATS = ['旅費交通費', '会議費', '接待交際費', '消耗品費', '通信費', '広告宣伝費', '車両費', '支払手数料', '外注費', '地代家賃', '水道光熱費', '新聞図書費', '研修費', '福利厚生費', '租税公課', '諸会費', '雑費'];
+const cat2 = sel => '<option value="">科目</option>' + EXP_CATS.map(c => `<option${c === sel ? ' selected' : ''}>${c}</option>`).join('');
+const biz2 = sel => ((state.data && state.data.biz) || []).map(b => `<option value="${b.key}"${b.key === sel ? ' selected' : ''}>${esc(b.name)}</option>`).join('');
+let cardLines = [];
+function cardTotal() {
+  const on = [...$('cTable').querySelectorAll('tr[data-i]')].filter(tr => tr.querySelector('[data-f=on]').checked);
+  $('cTotal').textContent = `${on.length}件　合計 ${yen(on.reduce((a, tr) => a + (Number(tr.querySelector('[data-f=amount]').value) || 0), 0))}`;
+}
+function drawCard() {
+  $('cBox').hidden = !cardLines.length;
+  $('cAllBiz').innerHTML = '<option value="">選ぶ</option>' + biz2(''); $('cAllCat').innerHTML = cat2('');
+  $('cTable').innerHTML = '<thead><tr><th></th><th>利用日</th><th>お店</th><th>金額</th><th>事業</th><th>科目</th></tr></thead><tbody>' + cardLines.map((l, i) => `<tr data-i="${i}">
+    <td><input type="checkbox" data-f="on" ${l.done ? 'disabled' : l.amount > 0 ? 'checked' : ''}></td>
+    <td><input type="date" data-f="date" value="${l.date}"></td>
+    <td style="text-align:left"><input data-f="memo" value="${esc(l.shop)}" style="width:100%;min-width:140px">${l.done ? '<span class="tag">入れ済み</span>' : l.dup ? '<span class="tag">重複かも</span>' : ''}${l.amount < 0 ? '<span class="tag">返品・マイナス</span>' : ''}</td>
+    <td><input type="number" data-f="amount" value="${l.amount}" style="width:100px"></td>
+    <td><select data-f="biz">${biz2('common')}</select></td>
+    <td><select data-f="category">${cat2('')}</select></td></tr>`).join('') + '</tbody>';
+  $('cTable').querySelectorAll('input,select').forEach(x => x.onchange = cardTotal);
+  cardTotal();
+}
+$('cAllBiz').onchange = () => { if ($('cAllBiz').value) $('cTable').querySelectorAll('[data-f=biz]').forEach(s => s.value = $('cAllBiz').value); };
+$('cAllCat').onchange = () => { if ($('cAllCat').value) $('cTable').querySelectorAll('[data-f=category]').forEach(s => s.value = $('cAllCat').value); };
+$('cRead').onclick = () => {
+  const file = $('cFile').files[0];
+  if (!file) { $('cMsg').textContent = 'ファイルを選んでください'; return; }
+  $('cRead').disabled = true; $('cMsg').textContent = '読み取り中…（30秒ほどかかることがあります）';
+  const rd = new FileReader();
+  rd.onload = () => api('readCardStatement', { name: file.name, data: String(rd.result).split(',')[1] }).then(r => {
+    cardLines = r.lines; drawCard();
+    $('cMsg').textContent = r.lines.length ? `${r.lines.length}行 読めました。確かめて「まとめて入れる」を押してください` : '利用日と金額の行が見つかりませんでした（CSV があればそちらも試してください）';
+  }).catch(e => $('cMsg').textContent = e.message).finally(() => $('cRead').disabled = false);
+  rd.readAsDataURL(file);
+};
+$('cAdd').onclick = () => {
+  const list = [...$('cTable').querySelectorAll('tr[data-i]')].filter(tr => tr.querySelector('[data-f=on]').checked).map(tr => {
+    const o = { id: cardLines[tr.dataset.i].id }; tr.querySelectorAll('[data-f]').forEach(x => { if (x.dataset.f !== 'on') o[x.dataset.f] = x.value; }); return o;
+  });
+  if (!list.length) { $('cMsg').textContent = '入れる行がありません'; return; }
+  $('cAdd').disabled = true;
+  api('addExpenses', list).then(r => {
+    $('cMsg').textContent = `${r.added}件 経費に入れました` + (r.dup ? `（${r.dup}件は入れ済み）` : '');
+    cardLines = []; drawCard(); $('cFile').value = ''; loadExp(); refresh(true);
+  }).catch(e => $('cMsg').textContent = e.message).finally(() => $('cAdd').disabled = false);
+};
 $('eAdd').onclick = () => {
   const item = { date: $('eDate').value, biz: $('eBiz').value, category: $('eCat').value.trim(), memo: $('eMemo').value.trim(), amount: $('eAmt').value };
   if (!item.date || !item.amount) { $('eErr').textContent = '日付と金額を入れてください'; return; }

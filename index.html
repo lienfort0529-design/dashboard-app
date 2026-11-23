@@ -101,6 +101,16 @@
         <p id="eErr" class="err"></p>
       </div>
       <div class="card">
+        <h2>カード明細を入れる</h2>
+        <p class="muted small">カード会社の明細（PDF・Excel・CSV）を選ぶと、利用日・お店・金額を一行ずつ読みます。事業と科目を選び、いらない行のチェックを外して「まとめて入れる」。同じ明細の行は二重に入りません。</p>
+        <div class="bar"><input id="cFile" type="file" accept=".pdf,.xlsx,.xls,.csv"><button id="cRead" class="primary">読み取る</button><span id="cMsg" class="muted small"></span></div>
+        <div id="cBox" hidden>
+          <div class="bar"><span class="muted small">全部の事業を</span><select id="cAllBiz"></select><span class="muted small">全部の科目を</span><select id="cAllCat"></select></div>
+          <div class="tbl-wrap"><table class="tbl" id="cTable"></table></div>
+          <div class="bar" style="margin-top:10px"><button id="cAdd" class="primary">まとめて入れる</button><span id="cTotal" class="muted small"></span></div>
+        </div>
+      </div>
+      <div class="card">
         <h2>一覧</h2>
         <div class="tbl-wrap"><table class="tbl" id="expTable"></table></div>
       </div>
