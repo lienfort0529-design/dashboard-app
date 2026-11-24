@@ -108,6 +108,7 @@ button { cursor: pointer; }
 .amt { background: none; border: 0; padding: 0; font: inherit; color: inherit; text-decoration: underline dotted; cursor: pointer; }
 .amt-edit { display: inline-flex; gap: 4px; }
 .amt-edit input { width: 110px; padding: 4px 6px; }
+.amt-edit input[type=date] { width: 140px; }
 .partner-rows { display: grid; gap: 8px; margin-bottom: 10px; }
 .partner-row { display: grid; grid-template-columns: 1.2fr .9fr 1.6fr 1.2fr 1.2fr auto; gap: 6px; align-items: center; }
 .partner-head { font-size: 12px; color: var(--muted); }

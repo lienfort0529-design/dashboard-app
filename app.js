@@ -358,8 +358,21 @@ function loadStmt() {
     const ok = rest.filter(r => r.status === '反映');
     $('stmtTotal').textContent = ok.length ? `反映 ${ok.length}件　合計 ${yen(ok.reduce((a, r) => a + r.amount, 0))}` : '';
     $('stmtTable').innerHTML = rest.length ? '<thead><tr><th>支払日</th><th>事業</th><th>取引先</th><th>金額</th><th>状態</th><th></th></tr></thead><tbody>' +
-      rest.map(r => `<tr><td>${esc((r.date || '').slice(5).replace('-', '/'))}</td><td style="text-align:left">${esc(bizName(r.biz))}</td><td style="text-align:left"><a href="${esc(r.url)}" target="_blank" rel="noopener">${esc(r.partner || r.name)}</a></td><td>${r.status === '反映' ? yen(r.amount) : '—'}</td><td>${esc(r.status)}</td><td><button class="del" data-id="${esc(r.id)}">確認待ちに戻す</button></td></tr>`).join('') + '</tbody>'
+      rest.map(r => `<tr><td>${r.status === '反映' ? `<button class="amt" data-d="${esc(r.id)}" title="支払日を直す（入る月が変わります）">${esc((r.date || '').slice(5).replace('-', '/'))}</button>` : esc((r.date || '').slice(5).replace('-', '/'))}</td><td style="text-align:left">${esc(bizName(r.biz))}</td><td style="text-align:left"><a href="${esc(r.url)}" target="_blank" rel="noopener">${esc(r.partner || r.name)}</a></td><td>${r.status === '反映' ? yen(r.amount) : '—'}</td><td>${esc(r.status)}</td><td><button class="del" data-id="${esc(r.id)}">確認待ちに戻す</button></td></tr>`).join('') + '</tbody>'
       : '<tr><td class="muted">この月に反映した明細はまだありません</td></tr>';
+    // 反映した明細の支払日を直す（違う月に入ったとき）。事業・取引先・金額はそのまま
+    $('stmtTable').querySelectorAll('[data-d]').forEach(b => b.onclick = () => {
+      const r = rest.find(x => x.id === b.dataset.d), td = b.parentNode;
+      td.innerHTML = `<span class="amt-edit"><input type="date" value="${esc(r.date)}"><button class="del">保存</button></span>`;
+      const inp = td.querySelector('input'); inp.focus();
+      const save = () => {
+        td.querySelector('button').disabled = true;
+        api('approveStatement', r.id, { biz: r.biz, partner: r.partner, date: inp.value, amount: r.amount })
+          .then(() => { if (inp.value.slice(0, 7) !== $('stmtMonth').value) $('stmtMonth').value = inp.value.slice(0, 7); loadStmt(); refresh(true); })
+          .catch(e => { alert(e.message); td.querySelector('button').disabled = false; });
+      };
+      td.querySelector('button').onclick = save; inp.onkeydown = e => { if (e.key === 'Enter') save(); };
+    });
     $('stmtTable').querySelectorAll('.del').forEach(b => b.onclick = () => {
       b.disabled = true;
       api('setStatementStatus', b.dataset.id, '確認待ち').then(() => { loadStmt(); refresh(true); }).catch(e => alert(e.message));
