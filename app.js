@@ -242,10 +242,22 @@ function loadExp() {
   api('expenses', $('expMonth').value).then(list => {
     $('expTotal').textContent = list.length ? `${list.length}件　合計 ${yen(list.reduce((a, r) => a + r.amount, 0))}` : '';
     $('expTable').innerHTML = list.length ? '<thead><tr><th>日付</th><th>事業</th><th>科目</th><th>内容</th><th>金額</th><th></th></tr></thead><tbody>' +
-      list.map(r => `<tr><td>${r.date.slice(5).replace('-', '/')}</td><td style="text-align:left">${esc(bizName(r.biz))}</td><td style="text-align:left">${esc(r.category)}</td><td style="text-align:left">${esc(r.memo)}${r.id.startsWith('fx:') ? '<span class="tag">固定</span>' : ''}</td><td><button class="amt" data-id="${esc(r.id)}" data-v="${r.amount}" title="金額を直す">${yen(r.amount)}</button></td><td><button class="del" data-id="${esc(r.id)}">消す</button></td></tr>`).join('') + '</tbody>'
+      list.map(r => `<tr><td><button class="amt" data-dt="${esc(r.id)}" data-date="${esc(r.date)}" title="日付を直す（入る月が変わります）">${r.date.slice(5).replace('-', '/')}</button></td><td style="text-align:left">${esc(bizName(r.biz))}</td><td style="text-align:left">${esc(r.category)}</td><td style="text-align:left">${esc(r.memo)}${r.id.startsWith('fx:') ? '<span class="tag">固定</span>' : ''}</td><td><button class="amt" data-id="${esc(r.id)}" data-v="${r.amount}" title="金額を直す">${yen(r.amount)}</button></td><td><button class="del" data-id="${esc(r.id)}">消す</button></td></tr>`).join('') + '</tbody>'
       : '<tr><td class="muted">この月の経費はまだありません</td></tr>';
     // 金額を押すと、その場で直せる
-    $('expTable').querySelectorAll('.amt').forEach(b => b.onclick = () => {
+    // 日付を直す（違う月に入ったとき）。直した月に表示を切り替える
+    $('expTable').querySelectorAll('[data-dt]').forEach(b => b.onclick = () => {
+      const td = b.parentNode;
+      td.innerHTML = `<span class="amt-edit"><input type="date" value="${esc(b.dataset.date)}"><button class="del">保存</button></span>`;
+      const inp = td.querySelector('input'); inp.focus();
+      const save = () => {
+        td.querySelector('button').disabled = true;
+        api('updateExpense', b.dataset.dt, { date: inp.value }).then(() => { $('expMonth').value = inp.value.slice(0, 7); loadExp(); refresh(true); })
+          .catch(e => { alert(e.message); td.querySelector('button').disabled = false; });
+      };
+      td.querySelector('button').onclick = save; inp.onkeydown = e => { if (e.key === 'Enter') save(); };
+    });
+    $('expTable').querySelectorAll('.amt[data-v]').forEach(b => b.onclick = () => {
       const td = b.parentNode;
       td.innerHTML = `<span class="amt-edit"><input type="number" inputmode="numeric" value="${b.dataset.v}"><button class="del">保存</button></span>`;
       const inp = td.querySelector('input'); inp.focus();
