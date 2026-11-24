@@ -3,6 +3,7 @@
   --ink: #0b0b0b; --ink2: #52514e; --muted: #8a8984;
   --navy: #1f2a3c; --accent: #2a78d6;
   --s1: #2a78d6; --s2: #eb6834; --ln: #0b0b0b;
+  --b1: #2a78d6; --b2: #0f9d8a; --b3: #e07b1f; --b4: #8b5cc7; --b5: #8a8984;
   --good: #0a7d0a; --bad: #c63b3a;
   color-scheme: light;
 }
@@ -12,6 +13,7 @@
     --ink: #f0efec; --ink2: #c3c2b7; --muted: #8f8e88;
     --navy: #0f1724; --accent: #3987e5;
     --s1: #3987e5; --s2: #d95926; --ln: #f0efec;
+    --b1: #4a95ec; --b2: #2bb8a3; --b3: #f0923a; --b4: #a37ce0; --b5: #9a9993;
     --good: #2fbf2f; --bad: #e66767;
     color-scheme: dark;
   }
@@ -74,6 +76,10 @@ button { cursor: pointer; }
 .legend span { display: inline-flex; align-items: center; gap: 6px; }
 .sw { display: inline-block; width: 12px; height: 12px; border-radius: 3px; }
 .sw.s1 { background: var(--s1); } .sw.s2 { background: var(--s2); }
+.card-head { display: flex; justify-content: space-between; align-items: center; gap: 8px; flex-wrap: wrap; margin-bottom: 10px; }
+.card-head h2 { margin: 0; }
+.legend { flex-wrap: wrap; }
+.chart .xh { stroke: var(--ink2); stroke-dasharray: 3 3; }
 .sw.ln { height: 2px; border-radius: 1px; background: var(--ln); width: 16px; }
 .chart { position: relative; margin-bottom: 8px; }
 .chart svg { display: block; width: 100%; height: auto; }

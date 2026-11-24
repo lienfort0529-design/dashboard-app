@@ -135,6 +135,7 @@ function render() {
   $('fiberDetail').innerHTML = parts.length ? `<p class="muted small" style="margin:10px 0 0">反映した明細：${parts.join(' ／ ')}</p>` : '';
 
   drawChart(d);
+  drawBizChart(d);
   $('monthTable').innerHTML = '<thead><tr><th>月</th><th>売上</th><th>経費</th><th>利益</th></tr></thead><tbody>' +
     d.months.map(ym => { const m = totals(d, [ym]); return `<tr><td>${ymLabel(ym)}</td><td>${yen(m.sales)}</td><td>${yen(m.expense)}</td><td class="${m.profit < 0 ? 'neg' : ''}">${yen(m.profit)}</td></tr>`; }).join('') +
     (() => { const a = totals(d, d.months); return `<tr class="total"><td>累計</td><td>${yen(a.sales)}</td><td>${yen(a.expense)}</td><td class="${a.profit < 0 ? 'neg' : ''}">${yen(a.profit)}</td></tr>`; })() + '</tbody>';
@@ -182,7 +183,52 @@ function drawChart(d) {
     rc.addEventListener('mouseleave', () => tip.hidden = true);
   });
 }
-window.addEventListener('resize', () => { if (state.data && state.data.months.length) drawChart(state.data); });
+// ===== 事業ごとの推移：売上・経費・利益を切り替え、事業ごとに折れ線1本（色は事業で固定） =====
+const BIZ_COLOR = { jutaku: 'var(--b1)', kyushu: 'var(--b2)', kaisen: 'var(--b3)', webma: 'var(--b4)', common: 'var(--b5)' };
+let bizMetric = 'sales';
+document.querySelectorAll('#bizMetric button').forEach(b => b.onclick = () => {
+  bizMetric = b.dataset.v;
+  document.querySelectorAll('#bizMetric button').forEach(x => x.classList.toggle('on', x === b));
+  if (state.data && state.data.months.length) drawBizChart(state.data);
+});
+function drawBizChart(d) {
+  const el = $('bizChart'), W = Math.max(320, el.clientWidth || 600), H = 240, L = 48, R = 12, T = 10, B = 26;
+  const val = (ym, b) => { const s = d.sales[ym][b.key] || 0, e = d.expense[ym][b.key] || 0; return bizMetric === 'sales' ? s : bizMetric === 'expense' ? e : s - e; };
+  // 売上は売上のある事業だけ。数字が全部 0 の事業は出さない
+  const series = d.biz.filter(b => !(bizMetric === 'sales' && b.expenseOnly)).map(b => ({ b: b, v: d.months.map(ym => val(ym, b)) })).filter(x => x.v.some(v => v));
+  $('bizLegend').innerHTML = series.map(x => `<span><i class="sw" style="background:${BIZ_COLOR[x.b.key]}"></i>${esc(x.b.name)}</span>`).join('');
+  if (!series.length) { el.innerHTML = '<div class="empty">まだ数字がありません</div>'; return; }
+  const all = series.flatMap(x => x.v), max = Math.max(1, ...all), min = Math.min(0, ...all);
+  const nice = v => { const p = Math.pow(10, Math.floor(Math.log10(v))); return [1, 2, 2.5, 5, 10].map(m => m * p).find(x => x >= v); };
+  const step = nice((max - min) / 4), top = Math.ceil(max / step) * step, bot = Math.floor(min / step) * step;
+  const y = v => T + (top - v) / (top - bot) * (H - T - B);
+  const n = d.months.length, cw = (W - L - R) / n, x = i => L + cw * i + cw / 2;
+  let s = `<svg viewBox="0 0 ${W} ${H}" role="img" aria-label="事業ごとの月の推移">`;
+  for (let v = bot; v <= top + 1e-6; v += step) s += `<line class="grid" x1="${L}" x2="${W - R}" y1="${y(v)}" y2="${y(v)}"/><text x="${L - 6}" y="${y(v) + 4}" text-anchor="end">${man(v)}</text>`;
+  d.months.forEach((ym, i) => s += `<text x="${x(i)}" y="${H - 8}" text-anchor="middle">${ymLabel(ym)}</text>`);
+  s += `<line class="base" x1="${L}" x2="${W - R}" y1="${y(0)}" y2="${y(0)}"/><line class="xh" id="bizXh" x1="0" x2="0" y1="${T}" y2="${H - B}" visibility="hidden"/>`;
+  series.forEach(sr => {
+    const c = BIZ_COLOR[sr.b.key];
+    if (n > 1) s += `<polyline fill="none" stroke="${c}" stroke-width="2" stroke-linejoin="round" points="${sr.v.map((v, i) => x(i) + ',' + y(v)).join(' ')}"/>`;
+    sr.v.forEach((v, i) => s += `<circle cx="${x(i)}" cy="${y(v)}" r="4" fill="${c}" stroke="var(--surface)" stroke-width="2"/>`);
+  });
+  d.months.forEach((ym, i) => s += `<rect data-i="${i}" x="${L + cw * i}" y="${T}" width="${cw}" height="${H - T - B}" fill="transparent"/>`);
+  el.innerHTML = s + '</svg>';
+  const tip = $('tip'), xh = el.querySelector('#bizXh'), label = { sales: '売上', expense: '経費', profit: '利益' }[bizMetric];
+  el.querySelectorAll('rect[data-i]').forEach(rc => {
+    const i = Number(rc.dataset.i);
+    const show = e => {
+      const p = e.touches ? e.touches[0] : e;
+      xh.setAttribute('x1', x(i)); xh.setAttribute('x2', x(i)); xh.setAttribute('visibility', 'visible');
+      tip.innerHTML = `<b>${ymFull(d.months[i])}の${label}</b>` + series.slice().sort((a, b) => b.v[i] - a.v[i]).map(sr => `<div class="row"><span><i class="sw" style="background:${BIZ_COLOR[sr.b.key]}"></i> ${esc(sr.b.name)}</span><span>${yen(sr.v[i])}</span></div>`).join('');
+      tip.hidden = false;
+      tip.style.left = Math.min(p.clientX + 12, window.innerWidth - tip.offsetWidth - 8) + 'px'; tip.style.top = (p.clientY + 12) + 'px';
+    };
+    rc.addEventListener('mousemove', show); rc.addEventListener('touchstart', show, { passive: true });
+    rc.addEventListener('mouseleave', () => { tip.hidden = true; xh.setAttribute('visibility', 'hidden'); });
+  });
+}
+window.addEventListener('resize', () => { if (state.data && state.data.months.length) { drawChart(state.data); drawBizChart(state.data); } });
 document.addEventListener('touchstart', e => { if (!e.target.closest('#chart')) $('tip').hidden = true; }, { passive: true });
 
 // ===== 経費 =====
